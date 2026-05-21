@@ -4,10 +4,17 @@
 
 This project builds a sentiment classification system that labels finance-related tweets as **Bearish**, **Bullish**, or **Neutral** using deep learning models. We compare three RNN-based baselines against a fine-tuned BERT model on the [Twitter Financial News Sentiment](https://huggingface.co/datasets/zeroshot/twitter-financial-news-sentiment) dataset from Hugging Face.
 
-- **Training samples:** 9,543
-- **Validation samples:** 2,388
+- **Training samples used:** 9,543
+- **Validation samples used:** 2,388
 - **Classes:** Bearish (0), Bullish (1), Neutral (2)
 - **Class imbalance:** Neutral dominates at ~65.6% of all samples
+
+**Dataset count note:** The project uses the official Hugging Face
+`zeroshot/twitter-financial-news-sentiment` train/validation splits returned by
+`datasets.load_dataset`. The proposal/dataset-card text lists 9,938 training and
+2,486 validation instances, but the current Hugging Face dataset viewer and
+local CSVs expose 9,543 and 2,388 rows respectively. The code now warns when the
+loaded split sizes differ from the proposal counts.
 
 ---
 
@@ -37,25 +44,23 @@ The only difference is the recurrent cell type:
 
 | Model | Parameters | Accuracy | Macro F1 | Bearish P/R | Bullish P/R | Neutral P/R |
 |-------|-----------|----------|----------|-------------|-------------|-------------|
-| Simple RNN | ~1.05M | 65.58% | 0.2636 | 0.00/0.00 | 0.00/0.00 | 0.66/1.00 |
-| LSTM | ~1.12M | 65.58% | 0.2636 | 0.00/0.00 | 0.00/0.00 | 0.66/1.00 |
-| GRU | ~1.10M | 65.58% | 0.2636 | 0.00/0.00 | 0.00/0.00 | 0.66/1.00 |
+| Simple RNN | ~1.05M | 72.03% | 0.6322 | 0.45/0.59 | 0.56/0.56 | 0.86/0.80 |
+| LSTM | ~1.12M | 78.27% | 0.7093 | 0.55/0.63 | 0.66/0.69 | 0.89/0.84 |
+| GRU | ~1.10M | 79.10% | 0.7117 | 0.57/0.60 | 0.67/0.68 | 0.88/0.87 |
 
 ### Analysis: Which RNN/LSTM Variant Works Best and Why
 
-All three RNN variants achieved identical performance (65.58% accuracy, 0.264 Macro F1), with all models collapsing to **majority-class prediction** — predicting "Neutral" for every input. This is a well-documented failure mode when:
+The initial review found that the recurrent models were reading the final padded
+timestep instead of the last real token. After correcting that padding handling
+and retraining, the baselines no longer collapse to Neutral. GRU performs best
+with 79.10% accuracy and 0.7117 macro F1, narrowly ahead of LSTM.
 
-1. **Severe class imbalance exists:** The Neutral class comprises ~65.6% of the dataset. The models learn that always predicting Neutral minimizes cross-entropy loss quickly, and early stopping triggers before the model escapes this local minimum.
+GRU and LSTM outperform Simple RNN because their gates preserve useful context
+from short financial tweets more reliably. The remaining gap versus BERT is
+expected because these baselines still rely on randomly initialized embeddings
+and a small word-level vocabulary, while BERT starts with pre-trained financial
+language knowledge and subword tokenization.
 
-2. **Randomly initialized embeddings lack semantic knowledge:** Unlike pre-trained models, these RNN models start with random word embeddings. Financial tweets are short (avg ~15 words) and contain domain-specific language ($tickers, market jargon) that random embeddings cannot represent meaningfully within a few training epochs.
-
-3. **Simple architecture limitations:** With only 1 layer and 128-dimensional hidden states, the models have limited capacity to capture the subtle contextual cues that differentiate bearish from bullish sentiment (e.g., "surges" vs. "plummets").
-
-**In theory**, LSTM and GRU should outperform Simple RNN because:
-- **LSTM** uses forget/input/output gates to selectively remember and forget information, addressing the vanishing gradient problem
-- **GRU** achieves similar gating with fewer parameters (reset + update gates), often training faster
-
-However, in this dataset, the class imbalance overwhelms any architectural advantage. To make RNN models competitive, one would need: class-weighted loss, oversampling minority classes, pre-trained word embeddings (GloVe/Word2Vec), or a larger model with more training epochs.
 
 ---
 
@@ -72,6 +77,10 @@ However, in this dataset, the class imbalance overwhelms any architectural advan
 | Batch Size | 32 |
 | Max Sequence Length | 128 |
 
+The saved BERT config now uses the project label order:
+`0=Bearish`, `1=Bullish`, `2=Neutral`. This prevents Hugging Face config-based
+inference from confusing Bullish and Neutral labels.
+
 ### Results
 
 | Model | Accuracy | Macro F1 | Bearish P/R | Bullish P/R | Neutral P/R |
@@ -82,12 +91,12 @@ However, in this dataset, the class imbalance overwhelms any architectural advan
 
 | Metric | Best RNN | BERT | Improvement |
 |--------|----------|------|-------------|
-| Accuracy | 65.58% | 82.83% | +17.25 pp |
-| Macro F1 | 0.2636 | 0.7598 | **+187.8%** |
-| Bearish Recall | 0.00 | 0.61 | ∞ (from zero) |
-| Bullish Recall | 0.00 | 0.64 | ∞ (from zero) |
+| Accuracy | 79.10% | 82.83% | +3.73 pp |
+| Macro F1 | 0.7117 | 0.7598 | **+6.76%** |
+| Bearish Recall | 0.60 | 0.61 | +0.01 |
+| Bullish Recall | 0.68 | 0.64 | -0.04 |
 
-BERT achieves a **+187.8% improvement in Macro F1** over the best RNN model. The key reasons:
+BERT achieves a **+6.76% improvement in Macro F1** over the best corrected RNN model. The key reasons:
 
 1. **Pre-trained contextual embeddings:** FinBERT was pre-trained on financial text corpora, so it already understands financial terminology, ticker symbols, and sentiment-bearing phrases before fine-tuning.
 
@@ -159,8 +168,8 @@ The app opens at `http://localhost:8501`.
 ### Key Observations from the Dashboard
 
 - **BERT model** correctly identifies sentiment with high confidence (>90% for clear cases)
-- **RNN model** predicts "Neutral" for all inputs with ~63.5% probability — consistent with majority-class collapse
-- Switching between models demonstrates the dramatic quality difference in real-time
+- **Corrected RNN models** now produce class-specific predictions instead of collapsing to Neutral
+- Switching between models demonstrates BERT's smaller but still meaningful quality advantage in real-time
 
 ---
 
@@ -170,9 +179,12 @@ The app opens at `http://localhost:8501`.
 |--------|--------------|----------------|
 | Training Time | ~2 min (all three) | ~3 hrs (CPU, 2 epochs) |
 | Parameters | ~1M | ~110M |
-| Accuracy | 65.6% | 82.8% |
-| Macro F1 | 0.264 | 0.760 |
-| Handles Imbalance | No (majority-class collapse) | Yes (learns all classes) |
-| Real-world Usability | Not usable | Production-ready |
+| Accuracy | 79.1% | 82.8% |
+| Macro F1 | 0.712 | 0.760 |
+| Handles Imbalance | Partially, with class-weighted loss | Yes (learns all classes) |
+| Real-world Usability | Prototype baseline | Stronger prototype |
 
-**BERT/FinBERT is the clear winner**, achieving 82.8% accuracy and 0.76 Macro F1 with meaningful predictions across all three sentiment classes. The RNN baselines serve as a useful demonstration of why pre-trained language models have become the standard for NLP tasks — especially on small, imbalanced datasets where learning from scratch is insufficient.
+**BERT/FinBERT remains the best model**, achieving 82.8% accuracy and 0.76 Macro F1. The corrected GRU baseline is now competitive at 79.1% accuracy and 0.712 Macro F1, but BERT still benefits from financial pre-training, attention, and subword tokenization.
+
+
+

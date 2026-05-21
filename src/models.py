@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from src.data_loading import LABEL_MAP, LABEL_TO_ID
+
 
 class SimpleRNNClassifier(nn.Module):
     """
@@ -18,6 +20,7 @@ class SimpleRNNClassifier(nn.Module):
     def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes,
                  num_layers=1, dropout=0.3, pad_idx=0):
         super(SimpleRNNClassifier, self).__init__()
+        self.pad_idx = pad_idx
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
         self.rnn = nn.RNN(embed_dim, hidden_dim, num_layers=num_layers,
                           batch_first=True, dropout=dropout if num_layers > 1 else 0)
@@ -27,9 +30,9 @@ class SimpleRNNClassifier(nn.Module):
     def forward(self, x):
         # x: (batch_size, seq_len)
         embedded = self.embedding(x)  # (batch_size, seq_len, embed_dim)
-        output, hidden = self.rnn(embedded)  # hidden: (num_layers, batch_size, hidden_dim)
-        # Use last hidden state
-        hidden = hidden[-1]  # (batch_size, hidden_dim)
+        output, hidden = self.rnn(embedded)
+        lengths = (x != self.pad_idx).sum(dim=1).clamp(min=1) - 1
+        hidden = output[torch.arange(output.size(0), device=x.device), lengths]
         hidden = self.dropout(hidden)
         logits = self.fc(hidden)  # (batch_size, num_classes)
         return logits
@@ -43,6 +46,7 @@ class LSTMClassifier(nn.Module):
     def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes,
                  num_layers=1, dropout=0.3, bidirectional=False, pad_idx=0):
         super(LSTMClassifier, self).__init__()
+        self.pad_idx = pad_idx
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
         self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=num_layers,
                             batch_first=True,
@@ -56,11 +60,8 @@ class LSTMClassifier(nn.Module):
         # x: (batch_size, seq_len)
         embedded = self.embedding(x)
         output, (hidden, cell) = self.lstm(embedded)
-        # For bidirectional, concatenate last hidden states from both directions
-        if self.lstm.bidirectional:
-            hidden = torch.cat((hidden[-2], hidden[-1]), dim=1)
-        else:
-            hidden = hidden[-1]
+        lengths = (x != self.pad_idx).sum(dim=1).clamp(min=1) - 1
+        hidden = output[torch.arange(output.size(0), device=x.device), lengths]
         hidden = self.dropout(hidden)
         logits = self.fc(hidden)
         return logits
@@ -74,6 +75,7 @@ class GRUClassifier(nn.Module):
     def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes,
                  num_layers=1, dropout=0.3, bidirectional=False, pad_idx=0):
         super(GRUClassifier, self).__init__()
+        self.pad_idx = pad_idx
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
         self.gru = nn.GRU(embed_dim, hidden_dim, num_layers=num_layers,
                           batch_first=True,
@@ -87,10 +89,8 @@ class GRUClassifier(nn.Module):
         # x: (batch_size, seq_len)
         embedded = self.embedding(x)
         output, hidden = self.gru(embedded)
-        if self.gru.bidirectional:
-            hidden = torch.cat((hidden[-2], hidden[-1]), dim=1)
-        else:
-            hidden = hidden[-1]
+        lengths = (x != self.pad_idx).sum(dim=1).clamp(min=1) - 1
+        hidden = output[torch.arange(output.size(0), device=x.device), lengths]
         hidden = self.dropout(hidden)
         logits = self.fc(hidden)
         return logits
@@ -147,4 +147,6 @@ def load_bert_model(model_name="ahmedrachid/FinancialBERT-Sentiment-Analysis",
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name, num_labels=num_labels, ignore_mismatched_sizes=True
     )
+    model.config.id2label = LABEL_MAP
+    model.config.label2id = LABEL_TO_ID
     return model, tokenizer

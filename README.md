@@ -11,6 +11,14 @@ A sentiment classification system that labels finance-related tweets as **Bearis
 | **Dataset** | [Twitter Financial News Sentiment](https://huggingface.co/datasets/zeroshot/twitter-financial-news-sentiment) (11,932 tweets) |
 | **Models** | Simple RNN, LSTM, GRU, BERT (FinBERT) |
 
+## Dataset Split Note
+
+The proposal/dataset-card text lists 9,938 training rows and 2,486 validation
+rows. The current Hugging Face dataset viewer and the local CSV files in this
+project expose 9,543 training rows and 2,388 validation rows. The code uses the
+official `train` and `validation` splits returned by Hugging Face and warns if
+those counts differ from the proposal counts.
+
 ## Labels
 
 | Label ID | Name | Description |

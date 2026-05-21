@@ -26,7 +26,8 @@ import plotly.graph_objects as go
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
-from src.data_loading import LABEL_MAP, NUM_CLASSES, load_financial_sentiment_data
+from src.data_loading import (LABEL_MAP, LABEL_TO_ID, NUM_CLASSES,
+                              load_financial_sentiment_data)
 from src.preprocessing import clean_tweet, tokenize, PAD_IDX, UNK_IDX
 from src.models import get_rnn_model, load_bert_model
 from src.inference import predict_rnn, predict_bert
@@ -108,6 +109,8 @@ def load_bert_model_cached():
     model_path = os.path.join(MODEL_DIR, 'bert_finetuned')
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    model.config.id2label = LABEL_MAP
+    model.config.label2id = LABEL_TO_ID
     model.eval()
     return model, tokenizer
 

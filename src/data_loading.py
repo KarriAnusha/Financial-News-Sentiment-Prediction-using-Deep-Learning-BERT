@@ -13,6 +13,7 @@ import pandas as pd
 LABEL_MAP = {0: "Bearish", 1: "Bullish", 2: "Neutral"}
 LABEL_TO_ID = {"Bearish": 0, "Bullish": 1, "Neutral": 2}
 NUM_CLASSES = 3
+PROPOSAL_SPLIT_COUNTS = {"train": 9938, "validation": 2486}
 
 
 def load_financial_sentiment_data():
@@ -30,6 +31,29 @@ def load_financial_sentiment_data():
     val_df = pd.DataFrame(dataset["validation"])
 
     return train_df, val_df
+
+
+def validate_split_counts(train_df, val_df, expected_counts=None):
+    """
+    Compare loaded split sizes with the proposal/dataset-card counts.
+
+    The Hugging Face dataset viewer currently exposes 9,543 training rows and
+    2,388 validation rows, while the dataset-card text/proposal lists
+    9,938/2,486. This helper makes that mismatch explicit and reproducible.
+    """
+    expected_counts = expected_counts or PROPOSAL_SPLIT_COUNTS
+    actual_counts = {"train": len(train_df), "validation": len(val_df)}
+
+    for split_name, expected in expected_counts.items():
+        actual = actual_counts[split_name]
+        if actual != expected:
+            print(
+                f"Warning: {split_name} split has {actual:,} rows, "
+                f"not the proposal count of {expected:,}. Using the rows "
+                "returned by the official Hugging Face split."
+            )
+
+    return actual_counts
 
 
 def get_class_distribution(df, split_name="Dataset"):
