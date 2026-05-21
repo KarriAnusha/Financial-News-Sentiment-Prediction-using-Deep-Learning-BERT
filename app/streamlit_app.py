@@ -177,17 +177,15 @@ else:
 # --- Main Content ---
 col1, col2 = st.columns([1, 1])
 
+# Initialise session state for text input
+if "user_input" not in st.session_state:
+    st.session_state["user_input"] = ""
+
 with col1:
     st.subheader("Enter Financial Text")
-    user_input = st.text_area(
-        "Type a financial tweet or headline:",
-        placeholder="e.g., $AAPL Apple stock surges after strong earnings report",
-        height=120
-    )
 
-    predict_btn = st.button("Predict Sentiment", type="primary", use_container_width=True)
-
-    # Sample texts for quick testing
+    # Sample texts for quick testing (rendered before text_area so clicks
+    # update the default value before the widget is drawn this run)
     st.markdown("**Quick Test Samples:**")
     sample_texts = [
         "$AAPL Apple stock surges to all-time high after strong earnings beat",
@@ -196,8 +194,17 @@ with col1:
     ]
     for sample in sample_texts:
         if st.button(sample, key=sample):
-            user_input = sample
-            predict_btn = True
+            st.session_state["user_input"] = sample
+
+    user_input = st.text_area(
+        "Type a financial tweet or headline:",
+        value=st.session_state["user_input"],
+        placeholder="e.g., $AAPL Apple stock surges after strong earnings report",
+        height=120,
+        key="text_area_input"
+    )
+
+    predict_btn = st.button("Predict Sentiment", type="primary", use_container_width=True)
 
 with col2:
     if predict_btn and user_input.strip():

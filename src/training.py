@@ -10,7 +10,7 @@ import copy
 
 import torch
 import torch.nn as nn
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 from torch.utils.data import DataLoader, TensorDataset
 from transformers import get_linear_schedule_with_warmup
 
@@ -175,7 +175,21 @@ def train_bert_model(model, tokenizer, train_texts, train_labels,
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=0.01)
+    # AdamW with proper parameter groups: no weight decay on bias and LayerNorm weights
+    no_decay = ["bias", "LayerNorm.weight"]
+    optimizer_grouped_parameters = [
+        {
+            "params": [p for n, p in model.named_parameters()
+                       if not any(nd in n for nd in no_decay)],
+            "weight_decay": 0.01
+        },
+        {
+            "params": [p for n, p in model.named_parameters()
+                       if any(nd in n for nd in no_decay)],
+            "weight_decay": 0.0
+        }
+    ]
+    optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate)
     total_steps = len(train_loader) * num_epochs
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=int(0.1 * total_steps),

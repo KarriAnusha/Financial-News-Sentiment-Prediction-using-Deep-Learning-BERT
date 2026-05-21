@@ -107,6 +107,7 @@ The dashboard provides:
 - PyTorch >= 2.0.0
 - Hugging Face Datasets >= 2.14.0
 - Hugging Face Transformers >= 4.30.0
+- Accelerate >= 0.20.0
 - scikit-learn >= 1.3.0
 - Streamlit >= 1.28.0
 - matplotlib, seaborn, plotly
@@ -131,14 +132,13 @@ Due to GitHub's file size limits, large model files (such as `.safetensors` for 
 **For local evaluation or live demo:**
 
 - Download the required model files from your own backup, cloud storage, or retrain using the notebook.
-- Place the files in the appropriate folder, e.g.:
+- Place the files in the appropriate folder:
   - `notebooks/models/saved_models/bert_finetuned/model.safetensors`
-  - `notebooks/models/saved_models/bert_finetuned_new/model.safetensors`
 - The app and notebook will load these files if present. If missing, you will see an error or a message to download the model.
 
 **Tip:** You can share model files via Google Drive, Dropbox, or Hugging Face Hub and provide the download link here for collaborators.
 
 Example download instruction:
 ```
-Download the fine-tuned BERT model from [YOUR_LINK_HERE] and place it in `notebooks/models/saved_models/bert_finetuned_new/`.
+Download the fine-tuned BERT model from [YOUR_LINK_HERE] and place it in `notebooks/models/saved_models/bert_finetuned/`.
 ```
