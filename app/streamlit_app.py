@@ -118,7 +118,12 @@ def load_bert_model_cached():
 @st.cache_data
 def load_validation_distribution():
     """Load validation set class distribution for the distribution chart."""
-    _, val_df = load_financial_sentiment_data()
+    local_valid_path = os.path.join(PROJECT_ROOT, 'sent_valid.csv')
+    if os.path.exists(local_valid_path):
+        val_df = pd.read_csv(local_valid_path)
+    else:
+        _, val_df = load_financial_sentiment_data()
+
     counts = val_df['label'].value_counts().sort_index()
     dist_df = pd.DataFrame({
         'Sentiment': [LABEL_MAP[i] for i in counts.index],
@@ -181,8 +186,8 @@ else:
 col1, col2 = st.columns([1, 1])
 
 # Initialise session state for text input
-if "user_input" not in st.session_state:
-    st.session_state["user_input"] = ""
+if "text_area_input" not in st.session_state:
+    st.session_state["text_area_input"] = ""
 
 with col1:
     st.subheader("Enter Financial Text")
@@ -195,13 +200,12 @@ with col1:
         "$TSLA Tesla shares plummet 15% amid production delays",
         "The Federal Reserve will maintain current interest rates"
     ]
-    for sample in sample_texts:
-        if st.button(sample, key=sample):
-            st.session_state["user_input"] = sample
+    for index, sample in enumerate(sample_texts):
+        if st.button(sample, key=f"sample_{index}"):
+            st.session_state["text_area_input"] = sample
 
     user_input = st.text_area(
         "Type a financial tweet or headline:",
-        value=st.session_state["user_input"],
         placeholder="e.g., $AAPL Apple stock surges after strong earnings report",
         height=120,
         key="text_area_input"
